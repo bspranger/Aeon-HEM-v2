@@ -352,10 +352,7 @@ metadata {
 
 // HEM Version Configuration only needs to be done here - comments to choose what gets displayed
 
-		main (["energyDisp","energyTwo",
-			//"ampsDisp","voltsDisp",				// Comment out this one for HEMv1
-			"powerDisp"
-			])
+		main "powerDisp"
 		details([
 			"energyOne","energyDisp","energyTwo",
 			"powerOne","powerDisp","powerTwo",
@@ -392,16 +389,20 @@ def initialize() {
     // execute handlerMethod every hour on the half hour.
     unschedule(resetMinMaxatMidnight)
     schedule("0 0 0 * * ?", resetMinMaxatMidnight)
+    //schedule("0 * * * * ?", resetMinMaxatMidnight)
 }
 
 def resetMinMaxatMidnight()
 {
     state.powerHigh = 0
+    state.powerHighDisp = ""
     state.powerLow = 99999
+    state.powerLowDisp = ""
 }
 
 def parse(String description) {
-	//log.debug "Parse received ${description}"
+    def linkText = getLinkText(device)
+    log.debug "${linkText}: Parsing ${description}"
 	def result = null
 	def cmd = zwave.parse(description, [0x31: 1, 0x32: 1, 0x60: 3])
     if (cmd) 
@@ -410,7 +411,7 @@ def parse(String description) {
 		result = createEvent(zwaveEvent(cmd))
 	}
 	if (result) { 
-		log.debug "Parse returned ${result?.descriptionText}"
+		log.debug "${linkText}: Parse returned ${result?.descriptionText}"
 		return result
 	} else {
 	}
@@ -421,6 +422,8 @@ def zwaveEvent(physicalgraph.zwave.commands.sensormultilevelv1.SensorMultilevelR
     def dispValue
     def newValue
     def MAX_WATTS = 24000   
+    
+    def timeString = new Date().format("h:mm a", location.timeZone)
     
     switch(cmd.sensorType) 
     {
@@ -722,6 +725,8 @@ def zwaveEvent(physicalgraph.zwave.commands.multichannelv3.MultiChannelCmdEncap 
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.batteryv1.BatteryReport cmd) {
+    def linkText = getLinkText(device)
+    
 	def map = [:]
 	map.name = "battery"
 	map.unit = "%"
@@ -734,19 +739,21 @@ def zwaveEvent(physicalgraph.zwave.commands.batteryv1.BatteryReport cmd) {
 	else {
 		map.value = cmd.batteryLevel
 	}
-	log.debug map
+	log.debug "${linkText}: ${map}"
 	return map
 }
 
 def zwaveEvent(physicalgraph.zwave.Command cmd) {
 	// Handles all Z-Wave commands we aren't interested in
-    log.debug "Unhandled event ${cmd}"
+    def linkText = getLinkText(device)
+    log.debug "${linkText}: Unhandled event ${cmd}"
 	[:]
 }
 
 def refresh() {			// Request HEMv2 to send us the latest values for the 4 we are tracking
-	log.debug "refresh()"
-    
+	def linkText = getLinkText(device)
+    log.debug "${linkText}: refresh()"
+    resetMinMaxatMidnight()
 	delayBetween([
 		zwave.meterV2.meterGet(scale: 0).format(),		// Change 0 to 1 if international version
 		zwave.meterV2.meterGet(scale: 2).format(),
@@ -757,12 +764,14 @@ def refresh() {			// Request HEMv2 to send us the latest values for the 4 we are
 }
 
 def poll() {
-	log.debug "poll()"
+	def linkText = getLinkText(device)
+    log.debug "${linkText}: poll()"
 	refresh()
 }
 
 def toggleDisplay() {
-	log.debug "toggleDisplay()"
+	def linkText = getLinkText(device)
+    log.debug "${linkText}: toggleDisplay()"
     
 	if (state.display == 1) { 
 		state.display = 2 
@@ -774,7 +783,8 @@ def toggleDisplay() {
 }
 
 def resetDisplay() {
-	log.debug "resetDisplay() - energyL1Disp: ${state.energyL1Disp}"
+	def linkText = getLinkText(device)
+    log.debug "${linkText}: resetDisplay() - energyL1Disp: ${state.energyL1Disp}"
 	
 	if ( state.display == 1 ) {
     	sendEvent(name: "voltsOne", value: state.voltsLowDisp, unit: "")
@@ -799,7 +809,8 @@ def resetDisplay() {
 }
 
 def reset() {
-	log.debug "reset()"
+	def linkText = getLinkText(device)
+    log.debug "${linkText}: reset()"
 
 	state.energyValue = -1
 	state.powerValue = -1
@@ -855,7 +866,8 @@ def reset() {
 }
 
 def configure() {
-	log.debug "configure()"
+	def linkText = getLinkText(device)
+    log.debug "${linkText}: configure()"
     
 	Long kDelay = settings.kWhDelay as Long
     Long dDelay = settings.detailDelay as Long
@@ -889,7 +901,8 @@ def configure() {
 		zwave.configurationV1.configurationSet(parameterNumber: 103, size: 4, scaledConfigurationValue: 770).format(),		// Power (Watts) L1, L2, Total
 		zwave.configurationV1.configurationSet(parameterNumber: 113, size: 4, scaledConfigurationValue: 6).format() 		// every 6 seconds
 	], 2000)
-	log.debug cmd
+	
+    log.debug "${linkText}: ${cmd}"
 
 	cmd
 }
