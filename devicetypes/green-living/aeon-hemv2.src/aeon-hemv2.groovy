@@ -407,7 +407,7 @@ def parse(String description) {
 	def cmd = zwave.parse(description, [0x31: 1, 0x32: 1, 0x60: 3])
     if (cmd) 
     {
-    	//log.debug "Command Event ${cmd}"
+    	log.debug "${linkText}: Command Event ${cmd}"
 		result = createEvent(zwaveEvent(cmd))
 	}
 	if (result) { 
@@ -419,6 +419,8 @@ def parse(String description) {
 
 def zwaveEvent(physicalgraph.zwave.commands.sensormultilevelv1.SensorMultilevelReport cmd) 
 {
+    def linkText = getLinkText(device)
+    
     def dispValue
     def newValue
     def MAX_WATTS = 24000   
@@ -454,11 +456,15 @@ def zwaveEvent(physicalgraph.zwave.commands.sensormultilevelv1.SensorMultilevelR
                 [name: "power", value: newValue, unit: "W", descriptionText: "Total Power: ${newValue} Watts"]
             }
             break;
+        default:
+        	log.debug "${linkText}: SensorType Not handled ${cmd.sensorType}"
+        	break;
     }
     //return map
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.meterv1.MeterReport cmd) {
+    def linkText = getLinkText(device)
     def dispValue
     def newValue
     def formattedValue
@@ -515,6 +521,10 @@ def zwaveEvent(physicalgraph.zwave.commands.meterv1.MeterReport cmd) {
                 [name: "power", value: newValue, unit: "W", descriptionText: "Total Power: ${newValue} Watts"]
             }
 		}
+        else
+        {
+           log.debug "${linkText} Unhandled: Meter Type ${cmd.meterType}, Scale ${cmd.scale}"
+        }
  	}
     else if (cmd.meterType == 161) {
     	if (cmd.scale == 0) {
@@ -565,10 +575,19 @@ def zwaveEvent(physicalgraph.zwave.commands.meterv1.MeterReport cmd) {
 				[name: "amps", value: newValue, unit: "A", descriptionText: "Total Current: ${formattedValue} Amps"]
             }
         }
+        else
+        {
+           log.debug "${linkText} Unhandled: Meter Type ${cmd.meterType}, Scale ${cmd.scale}"
+        }
     }           
+    else
+    {
+        log.debug "${linkText} Unhandled: Meter Type ${cmd.meterType}"
+    }
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.multichannelv3.MultiChannelCmdEncap cmd) {
+    def linkText = getLinkText(device)
 	def dispValue
 	def newValue
 	def formattedValue
@@ -647,7 +666,11 @@ def zwaveEvent(physicalgraph.zwave.commands.multichannelv3.MultiChannelCmdEncap 
 						}
 					}
                	}               
-*/               	
+*/
+                else
+                {
+                    log.debug "${linkText} Unhandled: Command Class ${cmd.commandClass}, Source End Point ${cmd.sourceEndPoint}, Scale ${encapsulatedCommand.scale}"
+                }
 			} 
 			else if (cmd.sourceEndPoint == 2) {
 				if (encapsulatedCommand.scale == 2 ){
@@ -718,10 +741,22 @@ def zwaveEvent(physicalgraph.zwave.commands.multichannelv3.MultiChannelCmdEncap 
 						}
 					}
                	}               			
-*/               	
+*/               
+                else
+                {
+                    log.debug "${linkText} Unhandled: Command Class ${cmd.commandClass}, Source End Point ${cmd.sourceEndPoint}, Scale ${encapsulatedCommand.scale}"
+                }
 			}
+            else
+            {
+                log.debug "${linkText} Unhandled: Command Class ${cmd.commandClass}, Source End Point ${cmd.sourceEndPoint}"
+            }
 		}
 	}
+    else
+    {
+        log.debug "${linkText} Unhandled: Command Class ${cmd.commandClass}"
+    }
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.batteryv1.BatteryReport cmd) {
